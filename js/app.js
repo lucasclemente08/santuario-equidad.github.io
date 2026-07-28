@@ -85,6 +85,9 @@ const App = {
       case 'voluntariado':
         main.innerHTML = VolunteerSection.render();
         break;
+      case 'noticias':
+        main.innerHTML = NewsSection.render();
+        break;
       case 'contacto':
         main.innerHTML = ContactSection.render();
         setTimeout(() => ContactSection.init(), 100);
