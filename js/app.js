@@ -45,10 +45,17 @@ const App = {
     const main = document.getElementById('main-content');
     if (!main) return;
 
-    // Admin panel
+    // Admin panel — protegido por contraseña
     if (hash === 'admin') {
       this.loadAdminCSS();
-      main.innerHTML = AdminPanel.render();
+      if (!Auth.isAuthenticated()) {
+        main.innerHTML = Auth.renderLogin();
+        Auth.initLoginEvents();
+        Navbar.setActive('admin');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      main.innerHTML = '<div style="text-align:center;padding:3rem;">Cargando panel...</div>';
       setTimeout(() => AdminPanel.init(), 50);
       Navbar.setActive('admin');
       window.scrollTo({ top: 0, behavior: 'smooth' });

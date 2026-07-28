@@ -1,111 +1,202 @@
+
 // ═══════════════════════════════════════════
-// ADMIN PANEL — Panel de administración
-// Accesible vía #admin — Edita toda la web
+// ADMIN PANEL v2 — UX premium + auth
 // ═══════════════════════════════════════════
 
 const AdminPanel = {
-  currentSection: 'general',
+  currentSection: 'dashboard',
   config: null,
+  sidebarOpen: true,
 
-  render() {
+  // ── Init ──
+  init() {
+    if (!Auth.isAuthenticated()) {
+      this.showLogin();
+      return;
+    }
     this.config = Store.get();
-    return `
+    this.renderShell();
+    this.showSection('dashboard');
+    this.initSidebar();
+    this.initSearch();
+  },
+
+  showLogin(error = '') {
+    const main = document.getElementById('adminMain');
+    if (main) {
+      main.innerHTML = Auth.renderLogin(error);
+      Auth.initLoginEvents();
+    }
+  },
+
+  // ── Shell ──
+  renderShell() {
+    const main = document.getElementById('main-content');
+    if (!main) return;
+    const cfg = this.config;
+    main.innerHTML = `<div id="adminMain">` + `
       <div class="admin-layout">
-        <aside class="admin-sidebar">
+        <aside class="admin-sidebar" id="adminSidebar">
           <div class="admin-sidebar-header">
-            <h2>⚙️ Admin</h2>
-            <a href="#home" class="btn btn-sm" style="font-size:.75rem;padding:.3rem .75rem;">← Ver sitio</a>
+            <div class="admin-brand">
+              <img src="${cfg.site.logo}" alt="Logo" onerror="this.style.display='none'">
+              <div>
+                <h2>Admin</h2>
+                <span>${cfg.site.name}</span>
+              </div>
+            </div>
+            <button class="admin-sidebar-toggle" onclick="AdminPanel.toggleSidebar()" title="Colapsar menú">
+              <i class="fas fa-bars"></i>
+            </button>
           </div>
-          <nav class="admin-nav">
-            ${this.renderNav()}
-          </nav>
+          <nav class="admin-nav" id="adminNav">${this.renderNav()}</nav>
           <div class="admin-sidebar-footer">
-            <button class="btn btn-accent btn-sm btn-block" onclick="AdminPanel.exportConfig()" style="margin-bottom:.5rem;width:100%;">
-              📥 Exportar JSON
-            </button>
-            <button class="btn btn-outline btn-sm btn-block" onclick="AdminPanel.importConfig()" style="margin-bottom:.5rem;width:100%;">
-              📤 Importar JSON
-            </button>
-            <button class="btn btn-sm btn-block" onclick="AdminPanel.resetConfig()" style="width:100%;background:#dc3545;color:#fff;border:none;">
-              🔄 Resetear a defaults
-            </button>
+            <div class="admin-user-info">
+              <i class="fas fa-shield-haltered"></i>
+              <span>Administrador</span>
+            </div>
+            <div class="admin-sidebar-actions">
+              <button class="admin-btn-sm admin-btn-outline" onclick="AdminPanel.exportConfig()" title="Exportar configuración">
+                📥 Exportar
+              </button>
+              <button class="admin-btn-sm admin-btn-outline" onclick="AdminPanel.importConfig()" title="Importar configuración">
+                📤 Importar
+              </button>
+              <button class="admin-btn-sm admin-btn-outline" onclick="AdminPanel.showSection('password')" title="Cambiar contraseña">
+                🔑 Contraseña
+              </button>
+              <button class="admin-btn-sm admin-btn-danger" onclick="Auth.logout()" title="Cerrar sesión">
+                🚪 Salir
+              </button>
+            </div>
             <input type="file" id="importFile" accept=".json" style="display:none" onchange="AdminPanel.handleImport(event)">
           </div>
         </aside>
-        <main class="admin-main" id="adminMain">
-          ${this.renderSection('general')}
-        </main>
+        <main class="admin-main" id="adminContent"></main>
       </div>
-    `;
+      <div id="adminToastContainer"></div>
+    </div>`;
   },
 
-  init() {
-    // Navegación del admin
-    document.querySelectorAll('.admin-nav a').forEach(link => {
+  toggleSidebar() {
+    this.sidebarOpen = !this.sidebarOpen;
+    document.getElementById('adminSidebar')?.classList.toggle('collapsed', !this.sidebarOpen);
+  },
+
+  // ── Navigation ──
+  renderNav() {
+    const groups = [
+      {
+        label: 'Principal',
+        items: [
+          { id: 'dashboard', icon: 'fa-gauge-high', label: 'Dashboard' },
+          { id: 'general', icon: 'fa-gear', label: 'Configuración' },
+          { id: 'nav', icon: 'fa-list', label: 'Navegación' },
+        ]
+      },
+      {
+        label: 'Contenido',
+        items: [
+          { id: 'hero', icon: 'fa-image', label: 'Hero' },
+          { id: 'stats', icon: 'fa-chart-simple', label: 'Estadísticas' },
+          { id: 'help', icon: 'fa-hand-holding-heart', label: 'Cómo ayudar' },
+          { id: 'about', icon: 'fa-book-open', label: 'Nosotros' },
+          { id: 'animals', icon: 'fa-paw', label: 'Animales' },
+          { id: 'donate', icon: 'fa-circle-dollar-to-slot', label: 'Donar' },
+          { id: 'volunteer', icon: 'fa-people-arrows', label: 'Voluntariado' },
+        ]
+      },
+      {
+        label: 'Sistema',
+        items: [
+          { id: 'contact', icon: 'fa-envelope', label: 'Contacto' },
+          { id: 'footer', icon: 'fa-section', label: 'Footer' },
+          { id: 'whatsapp', icon: 'fa-whatsapp', label: 'WhatsApp' },
+          { id: 'theme', icon: 'fa-palette', label: 'Tema' },
+          { id: 'password', icon: 'fa-key', label: 'Contraseña' },
+        ]
+      }
+    ];
+
+    return groups.map(g => `
+      <div class="admin-nav-group">
+        <div class="admin-nav-group-label">${g.label}</div>
+        ${g.items.map(item => `
+          <a href="#" data-section="${item.id}" class="admin-nav-link" onclick="AdminPanel.showSection('${item.id}');return false;">
+            <i class="fas ${item.icon}"></i>
+            <span>${item.label}</span>
+          </a>
+        `).join('')}
+      </div>
+    `).join('');
+  },
+
+  initSidebar() {
+    document.querySelectorAll('.admin-nav-link').forEach(link => {
       link.addEventListener('click', (e) => {
         e.preventDefault();
         const section = link.dataset.section;
         this.showSection(section);
-        document.querySelectorAll('.admin-nav a').forEach(l => l.classList.remove('active'));
-        link.classList.add('active');
       });
     });
   },
 
-  renderNav() {
-    const sections = [
-      { id: 'general', icon: '🏠', label: 'General' },
-      { id: 'nav', icon: '📋', label: 'Navegación' },
-      { id: 'hero', icon: '🎯', label: 'Hero' },
-      { id: 'stats', icon: '📊', label: 'Estadísticas' },
-      { id: 'help', icon: '🆘', label: 'Cómo ayudar' },
-      { id: 'about', icon: '📖', label: 'Nosotros' },
-      { id: 'animals', icon: '🐾', label: 'Animales' },
-      { id: 'donate', icon: '💰', label: 'Donar' },
-      { id: 'volunteer', icon: '🙋', label: 'Voluntariado' },
-      { id: 'contact', icon: '✉️', label: 'Contacto' },
-      { id: 'footer', icon: '📌', label: 'Footer' },
-      { id: 'whatsapp', icon: '💬', label: 'WhatsApp' },
-      { id: 'theme', icon: '🎨', label: 'Tema' }
-    ];
-
-    return sections.map(s =>
-      `<a href="#" data-section="${s.id}" class="${s.id === 'general' ? 'active' : ''}">${s.icon} ${s.label}</a>`
-    ).join('');
+  initSearch() {
+    const searchInput = document.getElementById('adminAnimalSearch');
+    if (!searchInput) return;
+    searchInput.addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase();
+      document.querySelectorAll('.admin-animal-card').forEach(card => {
+        const text = card.textContent.toLowerCase();
+        card.style.display = text.includes(query) ? '' : 'none';
+      });
+    });
   },
 
+  // ── Section Router ──
   showSection(sectionId) {
+    if (!Auth.isAuthenticated()) { this.showLogin(); return; }
     this.currentSection = sectionId;
     this.config = Store.get();
-    document.getElementById('adminMain').innerHTML = this.renderSection(sectionId);
-    // Re-attach events
+
+    // Update active nav
+    document.querySelectorAll('.admin-nav-link').forEach(l => l.classList.remove('active'));
+    const active = document.querySelector(`.admin-nav-link[data-section="${sectionId}"]`);
+    if (active) active.classList.add('active');
+
+    const content = document.getElementById('adminContent');
+    if (!content) return;
+
+    content.innerHTML = this.renderSection(sectionId);
     this.attachEvents(sectionId);
+    if (sectionId === 'animals') this.initSearch();
   },
 
-  // ── Render each section form ──
+  // ── Render Sections ──
 
   renderSection(id) {
     this.config = Store.get();
-    switch (id) {
-      case 'general': return this.renderGeneral();
-      case 'nav': return this.renderNavEditor();
-      case 'hero': return this.renderHeroEditor();
-      case 'stats': return this.renderStatsEditor();
-      case 'help': return this.renderHelpEditor();
-      case 'about': return this.renderAboutEditor();
-      case 'animals': return this.renderAnimalsEditor();
-      case 'donate': return this.renderDonateEditor();
-      case 'volunteer': return this.renderVolunteerEditor();
-      case 'contact': return this.renderContactEditor();
-      case 'footer': return this.renderFooterEditor();
-      case 'whatsapp': return this.renderWhatsappEditor();
-      case 'theme': return this.renderThemeEditor();
-      default: return '<p>Sección no encontrada</p>';
-    }
+    const methods = {
+      'dashboard': 'renderDashboard',
+      'general': 'renderGeneral',
+      'nav': 'renderNavEditor',
+      'hero': 'renderHeroEditor',
+      'stats': 'renderStatsEditor',
+      'help': 'renderHelpEditor',
+      'about': 'renderAboutEditor',
+      'animals': 'renderAnimalsEditor',
+      'donate': 'renderDonateEditor',
+      'volunteer': 'renderVolunteerEditor',
+      'contact': 'renderContactEditor',
+      'footer': 'renderFooterEditor',
+      'whatsapp': 'renderWhatsappEditor',
+      'theme': 'renderThemeEditor',
+      'password': 'renderPasswordEditor',
+    };
+    return this[methods[id]] ? this[methods[id]]() : this.renderDashboard();
   },
 
   attachEvents(id) {
-    // Re-attach animal-specific events
     if (id === 'animals') {
       document.querySelectorAll('.admin-animal-delete').forEach(btn => {
         btn.onclick = () => this.deleteAnimal(btn.dataset.category, parseInt(btn.dataset.index));
@@ -114,19 +205,75 @@ const AdminPanel = {
     }
   },
 
-  // ── Field Helpers ──
+  // ═══ DASHBOARD ═══
+  renderDashboard() {
+    const c = this.config;
+    const totalAnimals = c.animales.adopcion.items.length + c.animales.apadrinamiento.items.length;
+    const cards = [
+      { icon: 'fa-paw', value: totalAnimals, label: 'Animales', color: '#52b788' },
+      { icon: 'fa-list', value: c.nav.length, label: 'Items de menú', color: '#f0a500' },
+      { icon: 'fa-chart-simple', value: c.stats.length, label: 'Estadísticas', color: '#40916c' },
+      { icon: 'fa-circle-dollar-to-slot', value: c.donate.progressPercent + '%', label: 'Progreso donaciones', color: '#2d6a4f' },
+    ];
 
-  textField(label, key, value, type = 'text') {
-    return `<div class="admin-field">
-      <label>${label}</label>
-      <input type="${type}" name="${key}" value="${this.esc(value || '')}" class="admin-input">
+    return `<div class="admin-section">
+      <h2><i class="fas fa-gauge-high"></i> Dashboard</h2>
+      <p class="admin-section-desc">Resumen general del sitio</p>
+
+      <div class="admin-dash-grid">
+        ${cards.map(card => `
+          <div class="admin-dash-card" style="border-left: 4px solid ${card.color};">
+            <div class="admin-dash-card-icon" style="background:${card.color}20;color:${card.color};">
+              <i class="fas ${card.icon}"></i>
+            </div>
+            <div class="admin-dash-card-info">
+              <span class="admin-dash-card-value">${card.value}</span>
+              <span class="admin-dash-card-label">${card.label}</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="admin-dash-sections">
+        <h3>Accesos rápidos</h3>
+        <div class="admin-dash-links">
+          ${[
+            { id:'hero', icon:'fa-image', label:'Editar Hero', desc:'Título, imágenes y botones principales' },
+            { id:'animals', icon:'fa-paw', label:'Gestionar Animales', desc:`${totalAnimals} animales — Agregar, editar, eliminar` },
+            { id:'donate', icon:'fa-circle-dollar-to-slot', label:'Configurar Donaciones', desc:'Métodos de pago y metas' },
+            { id:'about', icon:'fa-book-open', label:'Editar Nosotros', desc:'Historia, objetivos y video' },
+            { id:'contact', icon:'fa-envelope', label:'Formulario de Contacto', desc:'Formspree endpoint y mensajes' },
+            { id:'theme', icon:'fa-palette', label:'Personalizar Tema', desc:'Colores y apariencia' },
+          ].map(link => `
+            <div class="admin-dash-link" onclick="AdminPanel.showSection('${link.id}')">
+              <div class="admin-dash-link-icon"><i class="fas ${link.icon}"></i></div>
+              <div class="admin-dash-link-info">
+                <strong>${link.label}</strong>
+                <small>${link.desc}</small>
+              </div>
+              <i class="fas fa-chevron-right"></i>
+            </div>
+          `).join('')}
+        </div>
+      </div>
     </div>`;
   },
 
-  textareaField(label, key, value) {
-    return `<div class="admin-field">
+  // ═══ FIELD HELPERS ═══
+  textField(label, key, value, opts = {}) {
+    const type = opts.type || 'text';
+    const preview = opts.preview && value ? `<div class="admin-img-preview"><img src="${this.esc(value)}" onerror="this.style.display='none'" loading="lazy"></div>` : '';
+    return `<div class="admin-field ${opts.wide ? 'admin-field-wide' : ''}">
       <label>${label}</label>
-      <textarea name="${key}" class="admin-input" rows="3">${this.esc(value || '')}</textarea>
+      ${preview}
+      <input type="${type}" name="${key}" value="${this.esc(value || '')}" class="admin-input" placeholder="${opts.placeholder || ''}">
+    </div>`;
+  },
+
+  textareaField(label, key, value, opts = {}) {
+    return `<div class="admin-field admin-field-wide">
+      <label>${label}</label>
+      <textarea name="${key}" class="admin-input" rows="${opts.rows || 3}" placeholder="${opts.placeholder || ''}">${this.esc(value || '')}</textarea>
     </div>`;
   },
 
@@ -137,10 +284,37 @@ const AdminPanel = {
     </div>`;
   },
 
-  saveButton(sectionKey = null) {
-    return `<button class="btn btn-primary" style="margin-top:1rem;" onclick="AdminPanel.saveSection('${sectionKey || this.currentSection}')">
-      💾 Guardar cambios
+  colorField(label, key, value) {
+    return `<div class="admin-field">
+      <label>${label}</label>
+      <div class="admin-color-pick">
+        <input type="color" name="${key}" value="${value || '#2d6a4f'}">
+        <input type="text" name="${key}" value="${value || '#2d6a4f'}" class="admin-input" style="flex:1;">
+      </div>
+    </div>`;
+  },
+
+  saveButton() {
+    return `<button class="admin-save-btn" onclick="AdminPanel.saveSection()">
+      <i class="fas fa-floppy-disk"></i> Guardar cambios
     </button>`;
+  },
+
+  sectionHeader(title, desc = '') {
+    return `<div class="admin-section-header">
+      <h2>${title}</h2>
+      ${desc ? `<p class="admin-section-desc">${desc}</p>` : ''}
+    </div>`;
+  },
+
+  cardStart(title = '') {
+    return `<div class="admin-card">
+      ${title ? `<div class="admin-card-header"><h4>${title}</h4></div>` : ''}
+      <div class="admin-card-body">`;
+  },
+
+  cardEnd() {
+    return `</div></div>`;
   },
 
   esc(str) {
@@ -148,244 +322,380 @@ const AdminPanel = {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   },
 
-  // ── Section Renderers ──
+  // ═══ SECTION RENDERERS ═══
 
   renderGeneral() {
     const s = this.config.site;
     return `<div class="admin-section">
-      <h2>🏠 Configuración General</h2>
-      ${this.textField('Nombre del sitio', 'site.name', s.name)}
-      ${this.textField('Tagline', 'site.tagline', s.tagline)}
-      ${this.textField('URL del logo', 'site.logo', s.logo)}
-      ${this.textField('Google Maps URL', 'site.googleMapsUrl', s.googleMapsUrl)}
+      ${this.sectionHeader('🏠 Configuración General', 'Datos básicos del sitio')}
+      <div class="admin-form-grid">
+        ${this.textField('Nombre del sitio', 'site.name', s.name)}
+        ${this.textField('Tagline', 'site.tagline', s.tagline)}
+        ${this.textField('URL del logo', 'site.logo', s.logo, {preview: true})}
+        ${this.textField('Google Maps URL', 'site.googleMapsUrl', s.googleMapsUrl)}
+      </div>
       ${this.saveButton()}
     </div>`;
   },
 
   renderNavEditor() {
     const items = this.config.nav.map((item, i) => `
-      <div class="admin-card" style="margin-bottom:.5rem;">
-        ${this.textField('Etiqueta', `nav.${i}.label`, item.label)}
-        ${this.textField('ID', `nav.${i}.id`, item.id)}
-        ${this.textField('Href', `nav.${i}.href`, item.href)}
+      <div class="admin-card">
+        <div class="admin-card-header">
+          <h4>#${i + 1} — ${this.esc(item.label)}</h4>
+          <span class="admin-badge">${item.href}</span>
+        </div>
+        <div class="admin-card-body">
+          <div class="admin-form-grid">
+            ${this.textField('Etiqueta', `nav.${i}.label`, item.label)}
+            ${this.textField('ID', `nav.${i}.id`, item.id)}
+            ${this.textField('Href', `nav.${i}.href`, item.href)}
+          </div>
+        </div>
       </div>
     `).join('');
-    return `<div class="admin-section"><h2>📋 Navegación</h2>${items}${this.saveButton('nav')}</div>`;
+
+    return `<div class="admin-section">
+      ${this.sectionHeader('📋 Navegación', 'Menú principal del sitio')}
+      ${items}
+      ${this.saveButton()}
+    </div>`;
   },
 
   renderHeroEditor() {
     const h = this.config.hero;
     return `<div class="admin-section">
-      <h2>🎯 Hero</h2>
-      ${this.textField('Título', 'hero.title', h.title)}
-      ${this.textareaField('Subtítulo', 'hero.subtitle', h.subtitle)}
-      ${this.textField('Imagen principal', 'hero.image', h.image)}
-      ${this.textField('Imagen de fondo', 'hero.backgroundImage', h.backgroundImage)}
-      <h4>Botones</h4>
-      ${h.buttons.map((b, i) => `
-        <div class="admin-card">
+      ${this.sectionHeader('🎯 Hero', 'Sección principal de la landing')}
+      <div class="admin-form-grid">
+        ${this.textField('Título', 'hero.title', h.title)}
+        ${this.textField('Imagen principal', 'hero.image', h.image, {preview: true})}
+      </div>
+      ${this.textareaField('Subtítulo', 'hero.subtitle', h.subtitle, {rows: 2})}
+      ${this.textField('Imagen de fondo', 'hero.backgroundImage', h.backgroundImage, {preview: true})}
+      <h4 style="margin-top:1.5rem;">Botones</h4>
+      ${h.buttons.map((b, i) => this.cardStart(`Botón ${i + 1}`) + `
+        <div class="admin-form-grid">
           ${this.textField('Texto', 'hero.buttons.' + i + '.text', b.text)}
           ${this.textField('Link', 'hero.buttons.' + i + '.href', b.href)}
         </div>
-      `).join('')}
-      ${this.saveButton('hero')}
+      ` + this.cardEnd()).join('')}
+      ${this.saveButton()}
     </div>`;
   },
 
   renderStatsEditor() {
-    const items = this.config.stats.map((s, i) => `
-      <div class="admin-card">
+    const items = this.config.stats.map((s, i) => this.cardStart(`Estadística ${i + 1}`) + `
+      <div class="admin-form-grid">
         ${this.numberField('Número objetivo', `stats.${i}.target`, s.target)}
         ${this.textField('Sufijo', `stats.${i}.suffix`, s.suffix)}
         ${this.textField('Etiqueta', `stats.${i}.label`, s.label)}
       </div>
-    `).join('');
-    return `<div class="admin-section"><h2>📊 Estadísticas</h2>${items}${this.saveButton('stats')}</div>`;
+    ` + this.cardEnd()).join('');
+
+    return `<div class="admin-section">
+      ${this.sectionHeader('📊 Estadísticas', 'Contadores animados del sitio')}
+      ${items}
+      ${this.saveButton()}
+    </div>`;
   },
 
   renderHelpEditor() {
-    const cards = this.config.helpCards.map((c, i) => `
-      <div class="admin-card">
+    const cards = this.config.helpCards.map((c, i) => this.cardStart(`Tarjeta ${i + 1}: ${this.esc(c.title)}`) + `
+      <div class="admin-form-grid">
         ${this.textField('Título', `helpCards.${i}.title`, c.title)}
-        ${this.textField('Descripción', `helpCards.${i}.desc`, c.desc)}
         ${this.textField('Icono (Font Awesome)', `helpCards.${i}.icon`, c.icon)}
+        ${this.textField('Descripción', `helpCards.${i}.desc`, c.desc)}
         ${this.textField('Link', `helpCards.${i}.link`, c.link)}
       </div>
-    `).join('');
-    return `<div class="admin-section"><h2>🆘 Cómo ayudar</h2>${cards}${this.saveButton('helpCards')}</div>`;
+    ` + this.cardEnd()).join('');
+
+    return `<div class="admin-section">
+      ${this.sectionHeader('🆘 Cómo ayudar', 'Tarjetas de la sección de ayuda')}
+      ${cards}
+      ${this.saveButton()}
+    </div>`;
   },
 
   renderAboutEditor() {
     const a = this.config.about;
-    let html = `<div class="admin-section"><h2>📖 Nosotros</h2>
-      ${this.textField('Título', 'about.title', a.title)}
+    let html = `<div class="admin-section">
+      ${this.sectionHeader('📖 Nosotros', 'Historia, problema y objetivos')}
+      <div class="admin-form-grid">
+        ${this.textField('Título', 'about.title', a.title)}
+        ${this.textField('Imagen', 'about.image', a.image, {preview: true})}
+      </div>
       ${this.textareaField('Subtítulo', 'about.subtitle', a.subtitle)}
-      ${this.textField('Imagen', 'about.image', a.image)}
-      ${this.textField('Video URL', 'about.videoUrl', a.videoUrl)}`;
+      ${this.textField('Video URL (YouTube embed)', 'about.videoUrl', a.videoUrl)}`;
 
     a.sections.forEach((s, i) => {
-      html += `<div class="admin-card">
-        ${this.textField('Título sección', `about.sections.${i}.title`, s.title)}`;
+      html += this.cardStart(s.title);
       s.paragraphs.forEach((p, j) => {
-        html += this.textareaField(`Párrafo ${j+1}`, `about.sections.${i}.paragraphs.${j}`, p);
+        html += this.textareaField(`Párrafo ${j + 1}`, `about.sections.${i}.paragraphs.${j}`, p);
       });
-      html += `</div>`;
+      html += this.cardEnd();
     });
 
-    html += `<h4>Objetivos</h4>`;
+    html += this.cardStart(a.objectivesTitle);
     a.objectives.forEach((o, i) => {
-      html += this.textareaField(`Objetivo ${i+1}`, `about.objectives.${i}`, o);
+      html += this.textField(`Objetivo ${i + 1}`, `about.objectives.${i}`, o);
     });
-
-    html += this.saveButton('about');
-    html += `</div>`;
+    html += this.cardEnd();
+    html += this.saveButton() + '</div>';
     return html;
   },
 
   renderAnimalsEditor() {
     const categories = ['adopcion', 'apadrinamiento'];
-    let html = '<div class="admin-section"><h2>🐾 Animales</h2>';
+    let html = `<div class="admin-section">
+      ${this.sectionHeader('🐾 Animales', 'Gestioná adopción y apadrinamiento')}
+      <div class="admin-toolbar">
+        <div class="admin-search">
+          <i class="fas fa-search"></i>
+          <input type="text" id="adminAnimalSearch" placeholder="Buscar animal..." class="admin-input">
+        </div>
+        <button id="addAnimalBtn" class="admin-btn admin-btn-accent">
+          <i class="fas fa-plus"></i> Agregar animal
+        </button>
+      </div>`;
 
     categories.forEach(cat => {
       const data = this.config.animales[cat];
-      html += `<h3>${data.title} (${data.items.length} animales)</h3>`;
-      html += this.textField('Título sección', `animales.${cat}.title`, data.title);
-      html += this.textareaField('Subtítulo', `animales.${cat}.subtitle`, data.subtitle);
+      const emoji = cat === 'adopcion' ? '🏠' : '🤝';
+      html += `<h3 style="margin:1.5rem 0 .75rem;">${emoji} ${data.title} <span class="admin-badge">${data.items.length}</span></h3>
+        <div class="admin-form-grid">
+          ${this.textField('Título sección', `animales.${cat}.title`, data.title)}
+          ${this.textField('Subtítulo', `animales.${cat}.subtitle`, data.subtitle)}
+        </div>`;
 
+      html += `<div class="admin-animals-grid">`;
       data.items.forEach((a, i) => {
-        html += `<div class="admin-card">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <h4>${a.nombre}</h4>
-            <button class="admin-animal-delete btn btn-sm" data-category="${cat}" data-index="${i}"
-                    style="background:#dc3545;color:#fff;border:none;padding:.25rem .75rem;border-radius:4px;cursor:pointer;">
-              🗑 Eliminar
-            </button>
+        html += `<div class="admin-animal-card">
+          <div class="admin-animal-preview">
+            <img src="${this.esc(a.imagen)}" alt="${this.esc(a.nombre)}" loading="lazy"
+                 onerror="this.src='assets/horse card.jpg'">
           </div>
-          ${this.textField('Nombre', `animales.${cat}.items.${i}.nombre`, a.nombre)}
-          ${this.textField('Tipo', `animales.${cat}.items.${i}.tipo`, a.tipo)}
-          ${this.textareaField('Historia', `animales.${cat}.items.${i}.historia`, a.historia)}
-          ${this.textField('Imagen', `animales.${cat}.items.${i}.imagen`, a.imagen)}
-          ${this.textField('Acción', `animales.${cat}.items.${i}.accion`, a.accion)}
+          <div class="admin-animal-info">
+            <div class="admin-animal-header">
+              <h4>${this.esc(a.nombre)}</h4>
+              <div class="admin-animal-actions-top">
+                <span class="admin-badge admin-badge-type">${this.esc(a.tipo)}</span>
+                <button class="admin-animal-delete" data-category="${cat}" data-index="${i}" title="Eliminar">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+            </div>
+            ${this.textField('Nombre', `animales.${cat}.items.${i}.nombre`, a.nombre)}
+            ${this.textField('Tipo', `animales.${cat}.items.${i}.tipo`, a.tipo)}
+            ${this.textareaField('Historia', `animales.${cat}.items.${i}.historia`, a.historia, {rows: 2})}
+            ${this.textField('Imagen', `animales.${cat}.items.${i}.imagen`, a.imagen, {preview: true})}
+            ${this.textField('Texto del botón', `animales.${cat}.items.${i}.accion`, a.accion)}
+          </div>
         </div>`;
       });
+      html += `</div>`;
     });
 
-    html += `<button id="addAnimalBtn" class="btn btn-accent" style="margin-top:1rem;">➕ Agregar animal (a Adopción)</button>`;
-    html += this.saveButton('animales');
-    html += '</div>';
+    html += this.saveButton() + '</div>';
     return html;
   },
 
   renderDonateEditor() {
     const d = this.config.donate;
-    let html = `<div class="admin-section"><h2>💰 Donar</h2>
-      ${this.textField('Título', 'donate.title', d.title)}
+    let html = `<div class="admin-section">
+      ${this.sectionHeader('💰 Donar', 'Métodos de pago y metas')}
+      <div class="admin-form-grid">
+        ${this.textField('Título', 'donate.title', d.title)}
+        ${this.numberField('% Progreso', 'donate.progressPercent', d.progressPercent)}
+      </div>
       ${this.textareaField('Subtítulo', 'donate.subtitle', d.subtitle)}
-      ${this.numberField('% Progreso', 'donate.progressPercent', d.progressPercent)}
-      ${this.numberField('Monto actual', 'donate.progressCurrent', d.progressCurrent)}
-      ${this.numberField('Meta', 'donate.progressGoal', d.progressGoal)}`;
+      <div class="admin-form-grid">
+        ${this.numberField('Monto actual ($)', 'donate.progressCurrent', d.progressCurrent)}
+        ${this.numberField('Meta ($)', 'donate.progressGoal', d.progressGoal)}
+      </div>
 
-    d.methods.forEach((m, i) => {
-      html += `<div class="admin-card">
-        ${this.textField('Icono (emoji)', `donate.methods.${i}.icon`, m.icon)}
-        ${this.textField('Título', `donate.methods.${i}.title`, m.title)}
-        ${this.textareaField('Descripción', `donate.methods.${i}.desc`, m.desc)}
-      </div>`;
-    });
-
-    html += this.saveButton('donate');
-    html += '</div>';
+      <h4 style="margin-top:1.5rem;">Métodos de pago</h4>
+      ${d.methods.map((m, i) => this.cardStart() + `
+        <div class="admin-form-grid">
+          ${this.textField('Icono (emoji)', `donate.methods.${i}.icon`, m.icon)}
+          ${this.textField('Título', `donate.methods.${i}.title`, m.title)}
+          ${this.textareaField('Descripción', `donate.methods.${i}.desc`, m.desc)}
+        </div>
+      ` + this.cardEnd()).join('')}
+      ${this.saveButton()}
+    </div>`;
     return html;
   },
 
   renderVolunteerEditor() {
     const v = this.config.volunteer;
-    let html = `<div class="admin-section"><h2>🙋 Voluntariado</h2>
-      ${this.textField('Título', 'volunteer.title', v.title)}
+    let html = `<div class="admin-section">
+      ${this.sectionHeader('🙋 Voluntariado', 'Requisitos y enlaces')}
+      <div class="admin-form-grid">
+        ${this.textField('Título', 'volunteer.title', v.title)}
+        ${this.textField('Video URL', 'volunteer.videoUrl', v.videoUrl)}
+      </div>
       ${this.textareaField('Subtítulo', 'volunteer.subtitle', v.subtitle)}
-      ${this.textField('Video URL', 'volunteer.videoUrl', v.videoUrl)}
-      ${this.textField('YouTube URL', 'volunteer.youtubeUrl', v.youtubeUrl)}
-      ${this.textField('Facebook URL', 'volunteer.facebookUrl', v.facebookUrl)}
-      ${this.textField('Instagram URL', 'volunteer.instagramUrl', v.instagramUrl)}
-      <h4>Requisitos</h4>`;
-
-    v.requirements.forEach((r, i) => {
-      html += this.textField(`Requisito ${i+1}`, `volunteer.requirements.${i}`, r);
-    });
-
-    html += this.saveButton('volunteer');
-    html += '</div>';
+      <div class="admin-form-grid">
+        ${this.textField('YouTube URL', 'volunteer.youtubeUrl', v.youtubeUrl)}
+        ${this.textField('Facebook URL', 'volunteer.facebookUrl', v.facebookUrl)}
+        ${this.textField('Instagram URL', 'volunteer.instagramUrl', v.instagramUrl)}
+      </div>
+      ${this.cardStart('Requisitos')}
+      ${v.requirements.map((r, i) => this.textField(`Requisito ${i + 1}`, `volunteer.requirements.${i}`, r)).join('')}
+      ${this.cardEnd()}
+      ${this.saveButton()}
+    </div>`;
     return html;
   },
 
   renderContactEditor() {
     const c = this.config.contact;
-    return `<div class="admin-section"><h2>✉️ Contacto</h2>
-      ${this.textField('Título', 'contact.title', c.title)}
+    return `<div class="admin-section">
+      ${this.sectionHeader('✉️ Contacto', 'Formulario y Formspree')}
+      <div class="admin-form-grid">
+        ${this.textField('Título', 'contact.title', c.title)}
+        ${this.textField('Formspree Endpoint', 'contact.formspreeEndpoint', c.formspreeEndpoint)}
+      </div>
       ${this.textareaField('Subtítulo', 'contact.subtitle', c.subtitle)}
-      ${this.textField('Formspree Endpoint', 'contact.formspreeEndpoint', c.formspreeEndpoint)}
-      ${this.textField('Mensaje éxito (título)', 'contact.successTitle', c.successTitle)}
-      ${this.textareaField('Mensaje éxito (texto)', 'contact.successText', c.successText)}
-      ${this.saveButton('contact')}
+      <div class="admin-form-grid">
+        ${this.textField('Título éxito', 'contact.successTitle', c.successTitle)}
+        ${this.textareaField('Mensaje éxito', 'contact.successText', c.successText)}
+      </div>
+      ${this.saveButton()}
     </div>`;
   },
 
   renderFooterEditor() {
     const f = this.config.footer;
-    let html = `<div class="admin-section"><h2>📌 Footer</h2>
-      ${this.textField('Título about', 'footer.about.title', f.about.title)}
-      ${this.textareaField('Texto about', 'footer.about.text', f.about.text)}
-      ${this.textField('Ubicación', 'footer.about.location', f.about.location)}
-      ${this.textField('Copyright', 'footer.copyright', f.copyright)}
-      <h4>Enlaces</h4>`;
+    let html = `<div class="admin-section">
+      ${this.sectionHeader('📌 Footer', 'Pie de página y redes')}
+      ${this.cardStart('Información')}
+      <div class="admin-form-grid">
+        ${this.textField('Título', 'footer.about.title', f.about.title)}
+        ${this.textField('Ubicación', 'footer.about.location', f.about.location)}
+      </div>
+      ${this.textareaField('Texto', 'footer.about.text', f.about.text)}
+      ${this.textField('Copyright ({year} se reemplaza)', 'footer.copyright', f.copyright)}
+      ${this.cardEnd()}
 
-    f.links.forEach((l, i) => {
-      html += `<div class="admin-card">
-        ${this.textField('Label', `footer.links.${i}.label`, l.label)}
-        ${this.textField('Href', `footer.links.${i}.href`, l.href)}
-      </div>`;
-    });
+      ${this.cardStart('Enlaces')}
+      ${f.links.map((l, i) => `
+        <div class="admin-form-grid">
+          ${this.textField('Label', `footer.links.${i}.label`, l.label)}
+          ${this.textField('Href', `footer.links.${i}.href`, l.href)}
+        </div>
+      `).join('')}
+      ${this.cardEnd()}
 
-    html += `<h4>Redes Sociales</h4>`;
-    f.social.items.forEach((s, i) => {
-      html += `<div class="admin-card">
-        ${this.textField('Plataforma', `footer.social.items.${i}.platform`, s.platform)}
-        ${this.textField('URL', `footer.social.items.${i}.url`, s.url)}
-        ${this.textField('Icono FA', `footer.social.items.${i}.icon`, s.icon)}
-      </div>`;
-    });
-
-    html += this.saveButton('footer');
-    html += '</div>';
+      ${this.cardStart('Redes Sociales')}
+      ${f.social.items.map((s, i) => `
+        <div class="admin-form-grid">
+          ${this.textField('Plataforma', `footer.social.items.${i}.platform`, s.platform)}
+          ${this.textField('URL', `footer.social.items.${i}.url`, s.url)}
+          ${this.textField('Icono FA', `footer.social.items.${i}.icon`, s.icon)}
+        </div>
+      `).join('')}
+      ${this.cardEnd()}
+      ${this.saveButton()}
+    </div>`;
     return html;
   },
 
   renderWhatsappEditor() {
     const w = this.config.whatsapp;
-    return `<div class="admin-section"><h2>💬 WhatsApp</h2>
-      ${this.textField('Número (con código país)', 'whatsapp.number', w.number)}
+    return `<div class="admin-section">
+      ${this.sectionHeader('💬 WhatsApp', 'Botón flotante de contacto')}
+      <div class="admin-form-grid">
+        ${this.textField('Número (con código país)', 'whatsapp.number', w.number, {placeholder: '5493511234567'})}
+      </div>
       ${this.textareaField('Mensaje predeterminado', 'whatsapp.message', w.message)}
-      ${this.saveButton('whatsapp')}
+      ${this.saveButton()}
     </div>`;
   },
 
   renderThemeEditor() {
     const t = this.config.theme;
-    return `<div class="admin-section"><h2>🎨 Tema</h2>
-      ${this.textField('Color primario (hex)', 'theme.colors.primary', t.colors.primary)}
-      ${this.textField('Color acento (hex)', 'theme.colors.accent', t.colors.accent)}
-      ${this.textField('Fondo claro', 'theme.colors.bgLight', t.colors.bgLight)}
-      ${this.textField('Fondo oscuro', 'theme.colors.bgDark', t.colors.bgDark)}
-      ${this.saveButton('theme')}
+    return `<div class="admin-section">
+      ${this.sectionHeader('🎨 Tema', 'Colores y apariencia')}
+      <div class="admin-form-grid">
+        ${this.colorField('Color primario', 'theme.colors.primary', t.colors.primary)}
+        ${this.colorField('Color acento', 'theme.colors.accent', t.colors.accent)}
+        ${this.colorField('Fondo claro', 'theme.colors.bgLight', t.colors.bgLight)}
+        ${this.colorField('Fondo oscuro', 'theme.colors.bgDark', t.colors.bgDark)}
+      </div>
+      <p style="color:var(--text-light);font-size:.85rem;margin-top:.5rem;">
+        💡 Los cambios de color se aplican al guardar y recargar. Usá los color pickers para seleccionar.
+      </p>
+      ${this.saveButton()}
     </div>`;
   },
 
-  // ── CRUD Operations ──
+  renderPasswordEditor() {
+    return `<div class="admin-section">
+      ${this.sectionHeader('🔑 Cambiar Contraseña', 'Protegé el acceso al panel admin')}
+      <div class="admin-card">
+        <div class="admin-card-body">
+          <div class="admin-form-grid">
+            <div class="admin-field">
+              <label>Nueva contraseña</label>
+              <div class="auth-input-wrap">
+                <input type="password" id="newPassword" class="admin-input" placeholder="Mínimo 8 caracteres">
+                <button type="button" class="auth-toggle-pw" onclick="AdminPanel.toggleNewPw()" tabindex="-1">
+                  <i class="fas fa-eye"></i>
+                </button>
+              </div>
+            </div>
+            <div class="admin-field">
+              <label>Confirmar contraseña</label>
+              <input type="password" id="confirmPassword" class="admin-input" placeholder="Repetí la contraseña">
+            </div>
+          </div>
+          <div id="passwordMsg" style="margin-top:.75rem;"></div>
+          <button class="admin-save-btn" onclick="AdminPanel.doChangePassword()" style="margin-top:.5rem;">
+            <i class="fas fa-key"></i> Cambiar contraseña
+          </button>
+        </div>
+      </div>
+    </div>`;
+  },
 
-  saveSection(sectionKey) {
-    const inputs = document.querySelectorAll('.admin-input');
+  toggleNewPw() {
+    const input = document.getElementById('newPassword');
+    const icon = document.querySelector('#newPassword + .auth-toggle-pw i, .auth-input-wrap .auth-toggle-pw i');
+    if (input && icon) {
+      const isPassword = input.type === 'password';
+      input.type = isPassword ? 'text' : 'password';
+      icon.className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
+    }
+  },
+
+  async doChangePassword() {
+    const pwd = document.getElementById('newPassword')?.value;
+    const confirm = document.getElementById('confirmPassword')?.value;
+    const msg = document.getElementById('passwordMsg');
+
+    if (!pwd || pwd.length < 8) {
+      if (msg) msg.innerHTML = '<span style="color:#dc3545;">❌ La contraseña debe tener al menos 8 caracteres</span>';
+      return;
+    }
+    if (pwd !== confirm) {
+      if (msg) msg.innerHTML = '<span style="color:#dc3545;">❌ Las contraseñas no coinciden</span>';
+      return;
+    }
+
+    await Auth.changePassword(pwd);
+    if (msg) msg.innerHTML = '<span style="color:#52b788;">✅ Contraseña cambiada correctamente</span>';
+    this.showToast('🔑 Contraseña actualizada', 'success');
+  },
+
+  // ═══ CRUD ═══
+
+  saveSection() {
+    const inputs = document.querySelectorAll('.admin-input:not(#adminAnimalSearch)');
+    const colorInputs = document.querySelectorAll('.admin-color-pick input[type="color"]');
     const config = JSON.parse(JSON.stringify(this.config));
 
+    // Procesar inputs normales
     inputs.forEach(input => {
       const name = input.name;
       let value = input.value;
@@ -393,12 +703,20 @@ const AdminPanel = {
       this._setNested(config, name, value);
     });
 
+    // Procesar color inputs
+    colorInputs.forEach(input => {
+      const name = input.name;
+      // El color picker cambia el valor del input text hermano
+      const textInput = input.nextElementSibling;
+      if (textInput) {
+        this._setNested(config, name, textInput.value);
+      }
+    });
+
     Store.save(config);
     this.config = config;
-    this._showToast('✅ Cambios guardados');
-
-    // Recargar la página para reflejar cambios en navbar/footer
-    setTimeout(() => location.reload(), 800);
+    this.showToast('✅ Cambios guardados correctamente', 'success');
+    setTimeout(() => location.reload(), 1000);
   },
 
   addAnimal() {
@@ -412,21 +730,24 @@ const AdminPanel = {
     });
     Store.save(config);
     this.showSection('animals');
-    this._showToast('➕ Animal agregado a Adopción');
+    this.showToast('➕ Animal agregado a Adopción', 'info');
   },
 
   deleteAnimal(category, index) {
-    if (!confirm('¿Eliminar este animal?')) return;
+    if (!confirm(`¿Eliminar "${this.config.animales[category].items[index].nombre}"?\n\nEsta acción no se puede deshacer.`)) return;
     const config = Store.get();
+    const name = config.animales[category].items[index].nombre;
     config.animales[category].items.splice(index, 1);
     Store.save(config);
     this.showSection('animals');
-    this._showToast('🗑 Animal eliminado');
+    this.showToast(`🗑 "${name}" eliminado`, 'warning');
   },
+
+  // ═══ IMPORT/EXPORT ═══
 
   exportConfig() {
     Store.export();
-    this._showToast('📥 Configuración exportada');
+    this.showToast('📥 Configuración exportada como JSON', 'success');
   },
 
   importConfig() {
@@ -436,45 +757,38 @@ const AdminPanel = {
   async handleImport(event) {
     try {
       await Store.import(event.target.files[0]);
-      this._showToast('📤 Configuración importada. Recargando...');
-      setTimeout(() => location.reload(), 500);
+      this.showToast('📤 Archivo importado. Recargando...', 'info');
+      setTimeout(() => location.reload(), 800);
     } catch (err) {
-      this._showToast('❌ Error: ' + err.message);
+      this.showToast('❌ Error: ' + err.message, 'error');
     }
   },
 
-  resetConfig() {
-    if (!confirm('¿Resetear TODA la configuración a los valores por defecto? Esto no se puede deshacer.')) return;
-    Store.reset();
-    this._showToast('🔄 Configuración reseteada. Recargando...');
-    setTimeout(() => location.reload(), 500);
-  },
-
-  // ── Utilities ──
+  // ═══ UTILS ═══
 
   _setNested(obj, path, value) {
     const keys = path.split('.');
     let current = obj;
     for (let i = 0; i < keys.length - 1; i++) {
       const key = keys[i];
-      if (!(key in current)) current[key] = {};
-      if (Array.isArray(current) && !isNaN(keys[i+1])) {
-        // es array index
-      }
+      if (!(key in current)) current[key] = isNaN(keys[i + 1]) ? {} : [];
       current = current[key];
     }
     current[keys[keys.length - 1]] = value;
   },
 
-  _showToast(msg) {
+  showToast(msg, type = 'info') {
+    const container = document.getElementById('adminToastContainer');
+    if (!container) return;
+    const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
     const toast = document.createElement('div');
-    toast.className = 'admin-toast';
-    toast.textContent = msg;
-    document.body.appendChild(toast);
-    setTimeout(() => { toast.classList.add('show'); }, 10);
+    toast.className = `admin-toast admin-toast-${type}`;
+    toast.innerHTML = `${icons[type] || ''} ${msg}`;
+    container.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('show'));
     setTimeout(() => {
       toast.classList.remove('show');
       setTimeout(() => toast.remove(), 300);
-    }, 2500);
+    }, 3000);
   }
 };
