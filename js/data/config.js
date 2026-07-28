@@ -22,6 +22,7 @@ const DEFAULT_CONFIG = {
     { id: "donar", label: "Donar", href: "#donar" },
     { id: "apadrinar", label: "Apadrinar", href: "#apadrinar" },
     { id: "voluntariado", label: "Voluntariado", href: "#voluntariado" },
+    { id: "noticias", label: "Noticias", href: "#noticias" },
     { id: "contacto", label: "Contacto", href: "#contacto" }
   ],
 
@@ -168,6 +169,48 @@ const DEFAULT_CONFIG = {
     },
     successTitle: "¡Mensaje enviado!",
     successText: "Gracias por contactarnos. Te responderemos a la brevedad."
+  },
+
+  // ── Noticias / Foro ──
+  noticias: {
+    title: "Noticias",
+    subtitle: "Enterate de las últimas novedades del santuario",
+    items: [
+      {
+        id: 1,
+        title: "¡Rescatamos 5 caballos más!",
+        date: "2024-03-15",
+        author: "Santuario Equidad",
+        category: "rescates",
+        content: "Gracias al aviso de vecinos de la zona, pudimos rescatar a 5 caballos que estaban siendo utilizados para tracción a sangre en condiciones deplorables. Ya están en el santuario recibiendo atención veterinaria.",
+        image: "assets/horse-donate.jpg",
+        instagramUrl: "https://www.instagram.com/p/C4abc123EXAMPLE/",
+        tags: ["rescate", "caballos"]
+      },
+      {
+        id: 2,
+        title: "Nueva campaña de voluntariado 2024",
+        date: "2024-02-20",
+        author: "Santuario Equidad",
+        category: "voluntariado",
+        content: "Abrimos las inscripciones para voluntariado 2024. Buscamos personas comprometidas que quieran vivir una experiencia única ayudando a los animales. ¡Anotate!",
+        image: "assets/horse-volunteer.jpg",
+        instagramUrl: "",
+        tags: ["voluntariado", "2024"]
+      },
+      {
+        id: 3,
+        title: "Meta de donaciones alcanzada 🎉",
+        date: "2024-01-10",
+        author: "Santuario Equidad",
+        category: "donaciones",
+        content: "Gracias a su increíble apoyo, alcanzamos la meta de recaudación para construir el nuevo establo. 40 caballos tendrán un lugar más cómodo para descansar.",
+        image: "assets/horse card.jpg",
+        instagramUrl: "https://www.instagram.com/p/C4def456EXAMPLE/",
+        tags: ["donaciones", "logros"]
+      }
+    ],
+    categories: ["todas", "rescates", "voluntariado", "donaciones", "eventos", "animales"]
   },
 
   // ── Footer ──
