@@ -104,6 +104,7 @@ const AdminPanel = {
           { id: 'animals', icon: 'fa-paw', label: 'Animales' },
           { id: 'donate', icon: 'fa-circle-dollar-to-slot', label: 'Donar' },
           { id: 'volunteer', icon: 'fa-people-arrows', label: 'Voluntariado' },
+          { id: 'news', icon: 'fa-newspaper', label: 'Noticias' },
         ]
       },
       {
@@ -187,6 +188,7 @@ const AdminPanel = {
       'animals': 'renderAnimalsEditor',
       'donate': 'renderDonateEditor',
       'volunteer': 'renderVolunteerEditor',
+      'news': 'renderNewsEditor',
       'contact': 'renderContactEditor',
       'footer': 'renderFooterEditor',
       'whatsapp': 'renderWhatsappEditor',
@@ -209,8 +211,10 @@ const AdminPanel = {
   renderDashboard() {
     const c = this.config;
     const totalAnimals = c.animales.adopcion.items.length + c.animales.apadrinamiento.items.length;
+    const totalNews = c.noticias.items.length;
     const cards = [
       { icon: 'fa-paw', value: totalAnimals, label: 'Animales', color: '#52b788' },
+      { icon: 'fa-newspaper', value: totalNews, label: 'Noticias', color: '#e76f51' },
       { icon: 'fa-list', value: c.nav.length, label: 'Items de menú', color: '#f0a500' },
       { icon: 'fa-chart-simple', value: c.stats.length, label: 'Estadísticas', color: '#40916c' },
       { icon: 'fa-circle-dollar-to-slot', value: c.donate.progressPercent + '%', label: 'Progreso donaciones', color: '#2d6a4f' },
@@ -242,6 +246,7 @@ const AdminPanel = {
             { id:'animals', icon:'fa-paw', label:'Gestionar Animales', desc:`${totalAnimals} animales — Agregar, editar, eliminar` },
             { id:'donate', icon:'fa-circle-dollar-to-slot', label:'Configurar Donaciones', desc:'Métodos de pago y metas' },
             { id:'about', icon:'fa-book-open', label:'Editar Nosotros', desc:'Historia, objetivos y video' },
+          { id:'news', icon:'fa-newspaper', label:'Gestionar Noticias', desc:'Crear/editar noticias + Instagram embeds' },
             { id:'contact', icon:'fa-envelope', label:'Formulario de Contacto', desc:'Formspree endpoint y mensajes' },
             { id:'theme', icon:'fa-palette', label:'Personalizar Tema', desc:'Colores y apariencia' },
           ].map(link => `
@@ -546,6 +551,76 @@ const AdminPanel = {
       ${this.saveButton()}
     </div>`;
     return html;
+  },
+
+  renderNewsEditor() {
+    const n = this.config.noticias;
+    const items = [...n.items].sort((a, b) => new Date(b.date) - new Date(a.date));
+    const cards = items.map((item, i) => `
+      <div class="admin-animal-card">
+        ${item.image ? `<div class="admin-animal-preview"><img src="${this.esc(item.image)}" alt="${this.esc(item.title)}" loading="lazy" onerror="this.style.display='none'"></div>` : '<div class="admin-animal-preview" style="background:#f0f0f0;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:2rem;">📰</div>'}
+        <div class="admin-animal-info">
+          <div class="admin-animal-header">
+            <h4>${this.esc(item.title)}</h4>
+            <div class="admin-animal-actions-top">
+              <span class="admin-badge admin-badge-type">${this.esc(item.category)}</span>
+              <button class="admin-animal-delete" onclick="AdminPanel.deleteNews(${i})" title="Eliminar"><i class="fas fa-trash"></i></button>
+            </div>
+          </div>
+          <div class="admin-form-grid">
+            ${this.textField('Título', 'noticias.items.' + i + '.title', item.title)}
+            ${this.textField('Fecha', 'noticias.items.' + i + '.date', item.date, {type: 'date'})}
+            ${this.textField('Autor', 'noticias.items.' + i + '.author', item.author)}
+            ${this.textField('Categoría', 'noticias.items.' + i + '.category', item.category)}
+          </div>
+          ${this.textareaField('Contenido', 'noticias.items.' + i + '.content', item.content)}
+          <div class="admin-form-grid">
+            ${this.textField('Imagen', 'noticias.items.' + i + '.image', item.image, {preview: true})}
+            ${this.textField('Instagram URL', 'noticias.items.' + i + '.instagramUrl', item.instagramUrl, {placeholder: 'https://www.instagram.com/p/...'})}
+          </div>
+          ${this.textField('Tags (coma separados)', 'noticias.items.' + i + '.tags', (item.tags || []).join(', '))}
+        </div>
+      </div>
+    `).join('');
+
+    return '<div class="admin-section">' +
+      this.sectionHeader('📰 Noticias', 'Gestioná noticias y embeber posts de Instagram') +
+      '<div class="admin-toolbar">' +
+        '<div class="admin-search"><i class="fas fa-search"></i><input type="text" id="adminNewsSearch" placeholder="Buscar noticia..." class="admin-input" oninput="AdminPanel.searchNews(this.value)"></div>' +
+        '<button class="admin-btn admin-btn-accent" onclick="AdminPanel.addNews()"><i class="fas fa-plus"></i> Nueva noticia</button>' +
+      '</div>' +
+      '<div class="admin-animals-grid" id="newsGrid">' + cards + '</div>' +
+      this.saveButton() +
+    '</div>';
+  },
+
+  addNews() {
+    const config = Store.get();
+    config.noticias.items.unshift({
+      id: Date.now(), title: 'Nueva noticia',
+      date: new Date().toISOString().split('T')[0], author: 'Santuario Equidad',
+      category: 'rescates', content: 'Escribí el contenido aquí.', image: '', instagramUrl: '', tags: []
+    });
+    Store.save(config);
+    this.showSection('news');
+    this.showToast('📰 Noticia agregada', 'info');
+  },
+
+  deleteNews(index) {
+    const config = Store.get();
+    const title = config.noticias.items[index]?.title || 'esta noticia';
+    if (!confirm('¿Eliminar "' + title + '"?\nEsta acción no se puede deshacer.')) return;
+    config.noticias.items.splice(index, 1);
+    Store.save(config);
+    this.showSection('news');
+    this.showToast('🗑 "' + title + '" eliminada', 'warning');
+  },
+
+  searchNews(query) {
+    const q = query.toLowerCase();
+    document.querySelectorAll('#newsGrid .admin-animal-card').forEach(card => {
+      card.style.display = card.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
   },
 
   renderContactEditor() {
