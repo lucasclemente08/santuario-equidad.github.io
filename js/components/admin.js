@@ -80,7 +80,16 @@ const AdminPanel = {
 
   toggleSidebar() {
     this.sidebarOpen = !this.sidebarOpen;
-    document.getElementById('adminSidebar')?.classList.toggle('collapsed', !this.sidebarOpen);
+    var sidebar = document.getElementById('adminSidebar');
+    if (!sidebar) return;
+    // Desktop: collapsed, Mobile: open
+    if (window.innerWidth > 968) {
+      sidebar.classList.toggle('collapsed', !this.sidebarOpen);
+      sidebar.classList.remove('open');
+    } else {
+      sidebar.classList.toggle('open', this.sidebarOpen);
+      sidebar.classList.remove('collapsed');
+    }
   },
 
   // ── Navigation ──
